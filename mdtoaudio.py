@@ -3,16 +3,11 @@ import re
 import shutil
 import subprocess
 import sys
-import warnings
 
 import numpy as np
 import soundfile as sf
 from dotenv import load_dotenv
-
-with warnings.catch_warnings():
-    warnings.filterwarnings("ignore", category=UserWarning)
-    warnings.filterwarnings("ignore", category=FutureWarning)
-    from kokoro import KPipeline
+from kokoro import KPipeline
 
 load_dotenv()
 
@@ -108,10 +103,7 @@ def chunk_text(text: str, max_chars: int = 1000) -> list[str]:
 
 
 def convert_to_audio(chunks: list[str], out_path: str) -> None:
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=UserWarning)
-        warnings.filterwarnings("ignore", category=FutureWarning)
-        pipeline = KPipeline(lang_code="a", repo_id="hexgrad/Kokoro-82M")
+    pipeline = KPipeline(lang_code="a", repo_id="hexgrad/Kokoro-82M")
     audio_parts: list[np.ndarray] = []
 
     for i, chunk in enumerate(chunks, 1):
