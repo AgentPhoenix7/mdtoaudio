@@ -64,3 +64,33 @@ def test_embed_separated_from_body_by_blank_line(tmp_path):
 
     content = md_file.read_text()
     assert content.startswith("![[note.wav]]\n\n")
+
+
+def test_embeds_after_frontmatter(tmp_path):
+    md_file = tmp_path / "note.md"
+    md_file.write_text("---\nprev: '[[A]]'\nnext: '[[B]]'\n---\n# Hello\nWorld")
+    audio_file = tmp_path / "note.wav"
+    audio_file.touch()
+
+    embed_audio(str(md_file), str(audio_file))
+
+    content = md_file.read_text()
+    assert content.startswith("---\n")
+    lines = content.split("\n")
+    closing_dash = next(i for i, l in enumerate(lines) if l == "---" and i > 0)
+    embed_line = lines[closing_dash + 2]
+    assert embed_line == "![[note.wav]]"
+
+
+def test_replaces_embed_after_frontmatter(tmp_path):
+    md_file = tmp_path / "note.md"
+    md_file.write_text("---\nnext: '[[B]]'\n---\n\n![[old.wav]]\n\n# Hello")
+    audio_file = tmp_path / "note.wav"
+    audio_file.touch()
+
+    embed_audio(str(md_file), str(audio_file))
+
+    content = md_file.read_text()
+    assert "![[old.wav]]" not in content
+    assert "![[note.wav]]" in content
+    assert content.startswith("---\n")

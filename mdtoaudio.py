@@ -122,15 +122,23 @@ def embed_audio(md_path: str, audio_path: str) -> None:
     with open(md_path, "r", encoding="utf-8") as f:
         content = f.read()
 
-    # Remove any existing audio embed at the top of the file
-    content = re.sub(
-        r"^!\[\[.*?\.(wav|mp3|ogg|m4a)\]\]\n?",
-        "",
-        content,
-    )
-    content = content.lstrip("\n")
+    # Extract frontmatter if present
+    frontmatter = ""
+    body = content
+    frontmatter_match = re.match(r"^(---\n.*?\n---\n?)", content, flags=re.DOTALL)
+    if frontmatter_match:
+        frontmatter = frontmatter_match.group(1)
+        body = content[len(frontmatter):]
 
-    content = embed_line + "\n\n" + content
+    # Strip any existing audio embed from the top of the body
+    body = body.lstrip("\n")
+    body = re.sub(r"^!\[\[.*?\.(wav|mp3|ogg|m4a)\]\]\n\n?", "", body)
+    body = body.lstrip("\n")
+
+    if frontmatter:
+        content = frontmatter + "\n" + embed_line + "\n\n" + body
+    else:
+        content = embed_line + "\n\n" + body
 
     with open(md_path, "w", encoding="utf-8") as f:
         f.write(content)
