@@ -100,7 +100,16 @@ def chunk_text(text: str, max_chars: int = 1000) -> list[str]:
 
 
 def convert_to_audio(chunks: list[str], out_path: str) -> None:
-    pass
+    pipeline = KPipeline(lang_code="a")
+    audio_parts: list[np.ndarray] = []
+
+    for i, chunk in enumerate(chunks, 1):
+        print(f"Generating audio (chunk {i}/{len(chunks)})...")
+        for _, _, audio in pipeline(chunk, voice="af_heart", speed=1.0):
+            audio_parts.append(audio)
+
+    audio = np.concatenate(audio_parts)
+    sf.write(out_path, audio, SAMPLE_RATE)
 
 
 def embed_audio(md_path: str, audio_path: str) -> None:
