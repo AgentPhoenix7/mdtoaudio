@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "kokoro>=0.9.4",
+    "python-dotenv>=1.2.2",
     "soundfile>=0.14.0",
 ]
 
