@@ -103,7 +103,7 @@ sudo pacman -S espeak-ng        # Arch / Garuda
 ### Install
 
 ```bash
-git clone https://github.com/yourusername/mdtoaudio
+git clone https://github.com/AgentPhoenix7/mdtoaudio
 cd mdtoaudio
 
 uv sync
