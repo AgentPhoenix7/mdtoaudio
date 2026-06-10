@@ -26,7 +26,7 @@ from kokoro import KPipeline
 
 load_dotenv()
 
-VAULT_PATH = "/run/media/agntdrgn/Expansion/Drive Vault/"
+VAULT_PATH = r"D:\Drive Vault" if sys.platform == "win32" else "/run/media/agntdrgn/Expansion/Drive Vault/"
 SAMPLE_RATE = 24000
 
 
