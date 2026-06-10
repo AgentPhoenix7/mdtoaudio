@@ -79,7 +79,24 @@ def clean_text(content: str) -> str:
 
 
 def chunk_text(text: str, max_chars: int = 1000) -> list[str]:
-    pass
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+    chunks: list[str] = []
+    current: list[str] = []
+    current_len = 0
+
+    for para in paragraphs:
+        if current and current_len + len(para) > max_chars:
+            chunks.append("\n\n".join(current))
+            current = [para]
+            current_len = len(para)
+        else:
+            current.append(para)
+            current_len += len(para)
+
+    if current:
+        chunks.append("\n\n".join(current))
+
+    return chunks
 
 
 def convert_to_audio(chunks: list[str], out_path: str) -> None:
