@@ -159,7 +159,59 @@ def embed_audio(md_path: str, audio_path: str) -> None:
         f.write(content)
 
 
+def _pick_file_win32() -> str | None:
+    import ctypes
+    from ctypes import wintypes
+
+    OFN_PATHMUSTEXIST = 0x00000800
+    OFN_FILEMUSTEXIST = 0x00001000
+
+    class OPENFILENAMEW(ctypes.Structure):
+        _fields_ = [
+            ("lStructSize", wintypes.DWORD),
+            ("hwndOwner", wintypes.HWND),
+            ("hInstance", wintypes.HINSTANCE),
+            ("lpstrFilter", wintypes.LPCWSTR),
+            ("lpstrCustomFilter", ctypes.c_void_p),
+            ("nMaxCustFilter", wintypes.DWORD),
+            ("nFilterIndex", wintypes.DWORD),
+            ("lpstrFile", ctypes.c_void_p),
+            ("nMaxFile", wintypes.DWORD),
+            ("lpstrFileTitle", ctypes.c_void_p),
+            ("nMaxFileTitle", wintypes.DWORD),
+            ("lpstrInitialDir", wintypes.LPCWSTR),
+            ("lpstrTitle", wintypes.LPCWSTR),
+            ("Flags", wintypes.DWORD),
+            ("nFileOffset", wintypes.WORD),
+            ("nFileExtension", wintypes.WORD),
+            ("lpstrDefExt", wintypes.LPCWSTR),
+            ("lCustData", wintypes.LPARAM),
+            ("lpfnHook", ctypes.c_void_p),
+            ("lpTemplateName", ctypes.c_void_p),
+            ("pvReserved", ctypes.c_void_p),
+            ("dwReserved", wintypes.DWORD),
+            ("FlagsEx", wintypes.DWORD),
+        ]
+
+    buf = ctypes.create_unicode_buffer(32768)
+    ofn = OPENFILENAMEW()
+    ofn.lStructSize = ctypes.sizeof(OPENFILENAMEW)
+    ofn.lpstrFilter = "Markdown files\0*.md\0\0"
+    ofn.lpstrFile = ctypes.addressof(buf)
+    ofn.nMaxFile = len(buf)
+    ofn.lpstrInitialDir = VAULT_PATH
+    ofn.lpstrTitle = "Select a note to convert"
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST
+
+    if ctypes.windll.comdlg32.GetOpenFileNameW(ctypes.byref(ofn)):
+        return ctypes.wstring_at(ctypes.addressof(buf))
+    return None
+
+
 def pick_file() -> str | None:
+    if sys.platform == "win32":
+        return _pick_file_win32()
+
     if shutil.which("kdialog"):
         result = subprocess.run(
             ["kdialog", "--getopenfilename", VAULT_PATH, "*.md", "--title", "Select a note to convert"],
