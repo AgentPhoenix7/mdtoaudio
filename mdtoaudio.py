@@ -124,7 +124,7 @@ def convert_to_audio(chunks: list[str], out_path: str) -> None:
     for i, chunk in enumerate(chunks, 1):
         print(f"Generating audio (chunk {i}/{len(chunks)})...")
         for _, _, audio in pipeline(chunk, voice="af_heart", speed=1.0):
-            audio_parts.append(audio)
+            audio_parts.append(np.asarray(audio))
 
     audio = np.concatenate(audio_parts)
     sf.write(out_path, audio, SAMPLE_RATE)
