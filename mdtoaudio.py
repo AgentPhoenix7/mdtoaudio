@@ -134,11 +134,44 @@ def embed_audio(md_path: str, audio_path: str) -> None:
 
 
 def pick_file() -> str | None:
-    pass
+    root = tk.Tk()
+    root.withdraw()
+    path = filedialog.askopenfilename(
+        initialdir=VAULT_PATH,
+        title="Select a note to convert",
+        filetypes=[("Markdown files", "*.md")],
+    )
+    root.destroy()
+    return path or None
 
 
 def main() -> None:
-    pass
+    md_path = pick_file()
+    if not md_path:
+        print("No file selected. Exiting.")
+        sys.exit(0)
+
+    print(f"Selected: {md_path}")
+
+    print("Cleaning text...")
+    with open(md_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    text = clean_text(content)
+
+    if not text.strip():
+        print("No readable text found after cleaning. Exiting.")
+        sys.exit(1)
+
+    chunks = chunk_text(text)
+    stem = os.path.splitext(md_path)[0]
+    audio_path = stem + ".wav"
+
+    convert_to_audio(chunks, audio_path)
+
+    print("Embedding audio in note...")
+    embed_audio(md_path, audio_path)
+
+    print(f"Done → {audio_path}")
 
 
 if __name__ == "__main__":
