@@ -1,13 +1,18 @@
 import os
 import re
+import shutil
+import subprocess
 import sys
-import tkinter as tk
-from tkinter import filedialog
+import warnings
 
 import numpy as np
 import soundfile as sf
 from dotenv import load_dotenv
-from kokoro import KPipeline
+
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=UserWarning)
+    warnings.filterwarnings("ignore", category=FutureWarning)
+    from kokoro import KPipeline
 
 load_dotenv()
 
@@ -103,7 +108,10 @@ def chunk_text(text: str, max_chars: int = 1000) -> list[str]:
 
 
 def convert_to_audio(chunks: list[str], out_path: str) -> None:
-    pipeline = KPipeline(lang_code="a")
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=UserWarning)
+        warnings.filterwarnings("ignore", category=FutureWarning)
+        pipeline = KPipeline(lang_code="a", repo_id="hexgrad/Kokoro-82M")
     audio_parts: list[np.ndarray] = []
 
     for i, chunk in enumerate(chunks, 1):
@@ -145,6 +153,27 @@ def embed_audio(md_path: str, audio_path: str) -> None:
 
 
 def pick_file() -> str | None:
+    if shutil.which("kdialog"):
+        result = subprocess.run(
+            ["kdialog", "--getopenfilename", VAULT_PATH, "*.md", "--title", "Select a note to convert"],
+            capture_output=True,
+            text=True,
+        )
+        path = result.stdout.strip()
+        return path if path else None
+
+    if shutil.which("zenity"):
+        result = subprocess.run(
+            ["zenity", "--file-selection", "--title=Select a note to convert",
+             f"--filename={VAULT_PATH}", "--file-filter=Markdown files | *.md"],
+            capture_output=True,
+            text=True,
+        )
+        path = result.stdout.strip()
+        return path if path else None
+
+    import tkinter as tk
+    from tkinter import filedialog
     root = tk.Tk()
     root.withdraw()
     path = filedialog.askopenfilename(
