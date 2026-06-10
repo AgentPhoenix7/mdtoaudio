@@ -104,7 +104,24 @@ def convert_to_audio(chunks: list[str], out_path: str) -> None:
 
 
 def embed_audio(md_path: str, audio_path: str) -> None:
-    pass
+    audio_filename = os.path.basename(audio_path)
+    embed_line = f"![[{audio_filename}]]"
+
+    with open(md_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Remove any existing audio embed at the top of the file
+    content = re.sub(
+        r"^!\[\[.*?\.(wav|mp3|ogg|m4a)\]\]\n?",
+        "",
+        content,
+    )
+    content = content.lstrip("\n")
+
+    content = embed_line + "\n\n" + content
+
+    with open(md_path, "w", encoding="utf-8") as f:
+        f.write(content)
 
 
 def pick_file() -> str | None:
