@@ -6,7 +6,22 @@ import sys
 
 import numpy as np
 import soundfile as sf
+import torch.nn as _nn
+import torch.nn.utils as _nn_utils
+import torch.nn.utils.parametrizations as _parametrizations
 from dotenv import load_dotenv
+
+# Patch kokoro upstream bugs before import so fixes survive venv recreation:
+# 1. Replace deprecated weight_norm with the current parametrizations API
+_nn_utils.weight_norm = _parametrizations.weight_norm
+# 2. LSTM with num_layers=1 ignores dropout but PyTorch still warns about it
+_orig_lstm_init = _nn.LSTM.__init__
+def _patched_lstm_init(self, *args, **kwargs):
+    if kwargs.get("num_layers", args[2] if len(args) > 2 else 1) == 1:
+        kwargs.pop("dropout", None)
+    _orig_lstm_init(self, *args, **kwargs)
+_nn.LSTM.__init__ = _patched_lstm_init
+
 from kokoro import KPipeline
 
 load_dotenv()
