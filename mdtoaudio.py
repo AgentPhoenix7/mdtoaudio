@@ -40,6 +40,9 @@ def clean_text(content: str) -> str:
     # Keep regular code block content (strip backtick fences + language tag)
     content = re.sub(r"```(?:\w+)?\n?(.*?)```", r"\1", content, flags=re.DOTALL)
 
+    # Strip inline code backtick markers, keep inner text
+    content = re.sub(r"`(.+?)`", r"\1", content)
+
     # Strip embedded files ![[...]]
     content = re.sub(r"!\[\[.*?\]\]", "", content)
 
@@ -56,8 +59,8 @@ def clean_text(content: str) -> str:
     content = re.sub(r"\*\*\*(.+?)\*\*\*", r"\1", content)
     content = re.sub(r"\*\*(.+?)\*\*", r"\1", content)
     content = re.sub(r"\*(.+?)\*", r"\1", content)
-    content = re.sub(r"__(.+?)__", r"\1", content)
-    content = re.sub(r"_(.+?)_", r"\1", content)
+    content = re.sub(r"(?<!\w)__(.+?)__(?!\w)", r"\1", content)
+    content = re.sub(r"(?<!\w)_(.+?)_(?!\w)", r"\1", content)
 
     # Strip header markers, keep text
     content = re.sub(r"^#{1,6}\s+", "", content, flags=re.MULTILINE)

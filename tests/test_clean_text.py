@@ -106,8 +106,12 @@ def test_strips_tables():
 
 def test_keeps_inline_code():
     md = "Use `SELECT *` to query"
-    result = clean_text(md)
-    assert "SELECT *" in result
+    assert clean_text(md) == "Use SELECT * to query"
+
+
+def test_preserves_snake_case_identifiers():
+    md = "Use snake_case_var in your code"
+    assert "snake_case_var" in clean_text(md)
 
 
 def test_strips_standalone_horizontal_rule():
