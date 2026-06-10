@@ -83,9 +83,25 @@ def clean_text(content: str) -> str:
     # Strip header markers, keep text
     content = re.sub(r"^#{1,6}\s+", "", content, flags=re.MULTILINE)
 
-    # Strip table rows (lines starting and ending with |) and separator rows
-    content = re.sub(r"^\|.*\|$", "", content, flags=re.MULTILINE)
-    content = re.sub(r"^[-|: ]+$", "", content, flags=re.MULTILINE)
+    # Convert tables to spoken lines: headers row, then each data row, cells comma-joined
+    def _table_to_speech(text: str) -> str:
+        lines = text.split("\n")
+        result = []
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            if re.match(r"^\|.*\|$", line):
+                cells = [c.strip() for c in line.strip("|").split("|")]
+                cells = [c for c in cells if c]
+                # Skip separator rows (---|--- style)
+                if not all(re.match(r"^[-: ]+$", c) for c in cells):
+                    result.append(", ".join(cells) + ".")
+            else:
+                result.append(line)
+            i += 1
+        return "\n".join(result)
+
+    content = _table_to_speech(content)
 
     # Strip standalone horizontal rules
     content = re.sub(r"^---+$", "", content, flags=re.MULTILINE)
@@ -157,6 +173,90 @@ def embed_audio(md_path: str, audio_path: str) -> None:
 
     with open(md_path, "w", encoding="utf-8") as f:
         f.write(content)
+
+
+def _read_key() -> str:
+    """Read one keypress from stdin. Returns 'up', 'down', 'enter', 'cancel', or 'other'."""
+    platform = sys.platform
+    if platform == "win32":
+        import msvcrt
+        key = msvcrt.getch()
+        if key == b'\xe0':
+            key2 = msvcrt.getch()
+            if key2 == b'H': return "up"
+            if key2 == b'P': return "down"
+            return "other"
+        if key in (b'\r', b'\n'): return "enter"
+        if key in (b'q', b'Q', b'\x03'): return "cancel"
+        if key == b'k': return "up"
+        if key == b'j': return "down"
+        return "other"
+    else:
+        import termios
+        import tty
+        import select as _select
+        fd = sys.stdin.fileno()
+        old = termios.tcgetattr(fd)  # type: ignore[attr-defined]
+        try:
+            tty.setraw(fd)  # type: ignore[attr-defined]
+            ch = sys.stdin.read(1)
+            if ch == '\x1b' and _select.select([sys.stdin], [], [], 0.05)[0]:
+                ch += sys.stdin.read(2)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old)  # type: ignore[attr-defined]
+        if ch in ('\r', '\n'): return "enter"
+        if ch in ('q', 'Q', '\x03'): return "cancel"
+        if ch == 'k': return "up"
+        if ch == 'j': return "down"
+        if ch == '\x1b[A': return "up"
+        if ch == '\x1b[B': return "down"
+        return "other"
+
+
+def ask_mode() -> str | None:
+    """Arrow-key terminal menu. Returns 'file', 'folder', or None (cancelled)."""
+    options = [("file", "Single file"), ("folder", "Entire folder (recursive)")]
+    selected = 0
+
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            handle = ctypes.windll.kernel32.GetStdHandle(-11)
+            mode = ctypes.c_ulong()
+            if ctypes.windll.kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+                ctypes.windll.kernel32.SetConsoleMode(handle, mode.value | 0x0004)
+        except Exception:
+            pass
+
+    def _render(first: bool = False) -> None:
+        lines = ["", "  Select mode:", ""]
+        for i, (_, label) in enumerate(options):
+            if i == selected:
+                lines.append(f"  \033[1;36m▶ {label}\033[0m")
+            else:
+                lines.append(f"    {label}")
+        lines.append("")
+        lines.append("  ↑↓ / j k  navigate   Enter  confirm   q  quit")
+        if not first:
+            sys.stdout.write(f"\033[{len(lines)}A")
+        for line in lines:
+            sys.stdout.write(f"\r\033[2K{line}\n")
+        sys.stdout.flush()
+
+    _render(first=True)
+
+    while True:
+        key = _read_key()
+        if key == "up":
+            selected = (selected - 1) % len(options)
+            _render()
+        elif key == "down":
+            selected = (selected + 1) % len(options)
+            _render()
+        elif key == "enter":
+            return options[selected][0]
+        elif key == "cancel":
+            return None
 
 
 def _pick_file_win32() -> str | None:
@@ -244,33 +344,144 @@ def pick_file() -> str | None:
     return path or None
 
 
-def main() -> None:
-    md_path = pick_file()
-    if not md_path:
-        print("No file selected. Exiting.")
-        sys.exit(0)
+def _pick_folder_win32() -> str | None:
+    import ctypes
+    from ctypes import wintypes
 
-    print(f"Selected: {md_path}")
+    BIF_RETURNONLYFSDIRS = 0x0001
+    BIF_NEWDIALOGSTYLE = 0x0040
 
-    print("Cleaning text...")
+    class BROWSEINFOW(ctypes.Structure):
+        _fields_ = [
+            ("hwndOwner", wintypes.HWND),
+            ("pidlRoot", ctypes.c_void_p),
+            ("pszDisplayName", ctypes.c_void_p),
+            ("lpszTitle", wintypes.LPCWSTR),
+            ("ulFlags", wintypes.UINT),
+            ("lpfn", ctypes.c_void_p),
+            ("lParam", wintypes.LPARAM),
+            ("iImage", ctypes.c_int),
+        ]
+
+    shell32 = ctypes.windll.shell32
+    shell32.SHBrowseForFolderW.restype = ctypes.c_void_p
+    shell32.SHGetPathFromIDListW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p]
+    shell32.SHGetPathFromIDListW.restype = ctypes.c_bool
+    shell32.ILCreateFromPathW.restype = ctypes.c_void_p
+    shell32.ILCreateFromPathW.argtypes = [wintypes.LPCWSTR]
+    shell32.ILFree.restype = None
+    shell32.ILFree.argtypes = [ctypes.c_void_p]
+    ole32 = ctypes.windll.ole32
+    ole32.CoInitialize.argtypes = [ctypes.c_void_p]
+    ole32.CoTaskMemFree.argtypes = [ctypes.c_void_p]
+    ole32.CoTaskMemFree.restype = None
+    ole32.CoInitialize(None)
+
+    pidl_root = shell32.ILCreateFromPathW(VAULT_PATH)
+
+    display_name = ctypes.create_unicode_buffer(260)
+    bi = BROWSEINFOW()
+    bi.pidlRoot = pidl_root
+    bi.pszDisplayName = ctypes.addressof(display_name)
+    bi.lpszTitle = "Select a folder to convert (recursive)"
+    bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE
+
+    pidl = shell32.SHBrowseForFolderW(ctypes.byref(bi))
+
+    if pidl_root:
+        shell32.ILFree(pidl_root)
+
+    if not pidl:
+        return None
+
+    path_buf = ctypes.create_unicode_buffer(32768)
+    result = shell32.SHGetPathFromIDListW(pidl, path_buf)
+    ole32.CoTaskMemFree(pidl)
+    return path_buf.value if result else None
+
+
+def pick_folder() -> str | None:
+    platform = sys.platform
+    if platform == "win32":
+        return _pick_folder_win32()
+    else:
+        if shutil.which("kdialog"):
+            result = subprocess.run(
+                ["kdialog", "--getexistingdirectory", VAULT_PATH, "--title", "Select a folder to convert"],
+                capture_output=True,
+                text=True,
+            )
+            path = result.stdout.strip()
+            return path if path else None
+
+        if shutil.which("zenity"):
+            result = subprocess.run(
+                ["zenity", "--file-selection", "--directory",
+                 f"--filename={VAULT_PATH}", "--title=Select a folder to convert"],
+                capture_output=True,
+                text=True,
+            )
+            path = result.stdout.strip()
+            return path if path else None
+
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.withdraw()
+        path = filedialog.askdirectory(initialdir=VAULT_PATH, title="Select a folder to convert")
+        root.destroy()
+        return path or None
+
+
+def collect_md_files(folder: str) -> list[str]:
+    md_files = []
+    for root, _, files in os.walk(folder):
+        for f in files:
+            if f.lower().endswith(".md"):
+                md_files.append(os.path.join(root, f))
+    return sorted(md_files)
+
+
+def process_file(md_path: str) -> None:
+    print(f"Processing: {md_path}")
     with open(md_path, "r", encoding="utf-8") as f:
         content = f.read()
     text = clean_text(content)
-
     if not text.strip():
-        print("No readable text found after cleaning. Exiting.")
-        sys.exit(1)
-
+        print(f"  Skipping (no readable text): {md_path}")
+        return
     chunks = chunk_text(text)
-    stem = os.path.splitext(md_path)[0]
-    audio_path = stem + ".wav"
-
+    audio_path = os.path.splitext(md_path)[0] + ".wav"
     convert_to_audio(chunks, audio_path)
-
-    print("Embedding audio in note...")
     embed_audio(md_path, audio_path)
+    print(f"  Done → {audio_path}")
 
-    print(f"Done → {audio_path}")
+
+def main() -> None:
+    mode = ask_mode()
+    if mode is None:
+        print("Cancelled. Exiting.")
+        sys.exit(0)
+
+    if mode == "file":
+        md_path = pick_file()
+        if not md_path:
+            print("No file selected. Exiting.")
+            sys.exit(0)
+        process_file(md_path)
+    else:
+        folder = pick_folder()
+        if not folder:
+            print("No folder selected. Exiting.")
+            sys.exit(0)
+        md_files = collect_md_files(folder)
+        if not md_files:
+            print("No markdown files found in selected folder.")
+            sys.exit(1)
+        print(f"Found {len(md_files)} markdown file(s). Starting conversion...")
+        for md_path in md_files:
+            process_file(md_path)
+        print(f"\nAll done. Processed {len(md_files)} file(s).")
 
 
 if __name__ == "__main__":

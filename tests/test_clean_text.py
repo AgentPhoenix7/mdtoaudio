@@ -97,10 +97,12 @@ def test_strips_all_header_levels():
     assert "H3" in result
 
 
-def test_strips_tables():
+def test_tables_spoken_as_comma_lines():
     md = "| Col1 | Col2 |\n|------|------|\n| A    | B    |\n\nAfter table"
     result = clean_text(md)
     assert "|" not in result
+    assert "Col1, Col2." in result
+    assert "A, B." in result
     assert "After table" in result
 
 
