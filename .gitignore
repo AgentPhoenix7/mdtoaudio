@@ -11,3 +11,9 @@ wheels/
 
 # Environment variables
 .env
+
+# Editor config
+.vscode/
+
+# Claude Code session history
+.specstory/
