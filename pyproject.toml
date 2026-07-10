@@ -9,10 +9,17 @@ dependencies = [
     "kokoro>=0.9.4",
     "python-dotenv>=1.2.2",
     "soundfile>=0.14.0",
+    "torch",
 ]
 
 [tool.uv.sources]
 en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }
+torch = { index = "pytorch-cu132", marker = "sys_platform == 'win32' or sys_platform == 'linux'" }
+
+[[tool.uv.index]]
+name = "pytorch-cu132"
+url = "https://download.pytorch.org/whl/cu132"
+explicit = true
 
 [dependency-groups]
 dev = [

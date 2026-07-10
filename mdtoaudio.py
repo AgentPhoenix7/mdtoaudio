@@ -6,6 +6,7 @@ import sys
 
 import numpy as np
 import soundfile as sf
+import torch
 import torch.nn as _nn
 import torch.nn.utils as _nn_utils
 import torch.nn.utils.parametrizations as _parametrizations
@@ -134,7 +135,9 @@ def chunk_text(text: str, max_chars: int = 1000) -> list[str]:
 
 
 def convert_to_audio(chunks: list[str], out_path: str) -> None:
-    pipeline = KPipeline(lang_code="a", repo_id="hexgrad/Kokoro-82M")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Using device: {device}")
+    pipeline = KPipeline(lang_code="a", repo_id="hexgrad/Kokoro-82M", device=device)
     audio_parts: list[np.ndarray] = []
 
     for i, chunk in enumerate(chunks, 1):
