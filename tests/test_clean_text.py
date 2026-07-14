@@ -121,3 +121,19 @@ def test_strips_standalone_horizontal_rule():
     result = clean_text(md)
     assert "Above" in result
     assert "Below" in result
+
+
+def test_strips_curly_braces():
+    md = "note {some tag} end"
+    result = clean_text(md)
+    assert "{" not in result
+    assert "}" not in result
+    assert "note" in result
+    assert "some tag" in result
+    assert "end" in result
+
+
+def test_strips_orphaned_curly_brace():
+    md = "This is a sentence }"
+    result = clean_text(md)
+    assert "}" not in result

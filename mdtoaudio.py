@@ -84,6 +84,12 @@ def clean_text(content: str) -> str:
     # Strip header markers, keep text
     content = re.sub(r"^#{1,6}\s+", "", content, flags=re.MULTILINE)
 
+    # Strip curly braces (Dataview/Templater/LaTeX leftovers) — Kokoro's G2P
+    # tags them the same as parentheses, and an orphaned closing brace turns
+    # into an unpaired ")" phoneme that the TTS model mispronounces as a
+    # stray sound
+    content = re.sub(r"[{}]", "", content)
+
     # Convert tables to spoken lines: headers row, then each data row, cells comma-joined
     def _table_to_speech(text: str) -> str:
         lines = text.split("\n")
